@@ -1,4 +1,4 @@
-import { getPosts } from "./api.js";
+import { getPosts, postPost, toggleLikes, deletePost } from "./api.js";
 import { renderAddPostPageComponent } from "./components/add-post-page-component.js";
 import { renderAuthPageComponent } from "./components/auth-page-component.js";
 import {
@@ -8,7 +8,7 @@ import {
   POSTS_PAGE,
   USER_POSTS_PAGE,
 } from "./routes.js";
-import { renderPostsPageComponent } from "./components/posts-page-component.js";
+import { renderPostsPageComponent, renderUserPosts } from "./components/posts-page-component.js";
 import { renderLoadingPageComponent } from "./components/loading-page-component.js";
 import {
   getUserFromLocalStorage,
@@ -19,7 +19,7 @@ import {
 export let user = getUserFromLocalStorage();
 export let page = null;
 export let posts = [];
-
+console.log(user);
 const getToken = () => {
   const token = user ? `Bearer ${user.token}` : undefined;
   return token;
@@ -47,7 +47,20 @@ export const goToPage = (newPage, data) => {
     if (newPage === ADD_POSTS_PAGE) {
       // Если пользователь не авторизован, то отправляем его на авторизацию перед добавлением поста
       page = user ? ADD_POSTS_PAGE : AUTH_PAGE;
-      return renderApp();
+      if (user) {
+        return getPosts({ token: getToken() }, user._id)
+          .then((newPosts) => {
+            posts = newPosts;
+            renderApp();
+          })
+          .catch((error) => {
+            console.error(error);
+            goToPage(POSTS_PAGE);
+          });
+      }
+      else {
+        return renderApp();
+      }
     }
 
     if (newPage === POSTS_PAGE) {
@@ -71,16 +84,21 @@ export const goToPage = (newPage, data) => {
       console.log("Открываю страницу пользователя: ", data.userId);
       page = USER_POSTS_PAGE;
       posts = [];
-      return renderApp();
-    }
-
-    page = newPage;
-    renderApp();
-
-    return;
+      return getPosts({ token: getToken() }, data.userId)
+      .then((newPosts) => {
+        posts = newPosts;
+        renderApp();
+      })
+      .catch((error) => {
+        console.error(error);
+        goToPage(POSTS_PAGE);
+      });
   }
-
-  throw new Error("страницы не существует");
+  page = newPage;
+  renderApp();
+  return;
+}
+throw new Error("страницы не существует");
 };
 
 const renderApp = () => {
@@ -98,7 +116,7 @@ const renderApp = () => {
       appEl,
       setUser: (newUser) => {
         user = newUser;
-        saveUserToLocalStorage(user);
+        saveUserToLocalStorage(newUser);
         goToPage(POSTS_PAGE);
       },
       user,
@@ -110,12 +128,19 @@ const renderApp = () => {
     return renderAddPostPageComponent({
       appEl,
       onAddPostClick({ description, imageUrl }) {
-        // TODO: реализовать добавление поста в API
         console.log("Добавляю пост...", { description, imageUrl });
-        goToPage(POSTS_PAGE);
+        postPost({ token: getToken() }, description, imageUrl)
+          .then(() => {
+            goToPage(POSTS_PAGE);
+          })
+          .catch((error) => {
+            console.error(error);
+            goToPage(ADD_POSTS_PAGE);
+          });
       },
+      posts
     });
-  }
+  };
 
   if (page === POSTS_PAGE) {
     return renderPostsPageComponent({
@@ -125,9 +150,39 @@ const renderApp = () => {
 
   if (page === USER_POSTS_PAGE) {
     // TODO: реализовать страницу фотографию пользвателя
-    appEl.innerHTML = "Здесь будет страница фотографий пользователя";
-    return;
+    return renderUserPosts({
+      appEl,
+    });
   }
 };
 
 goToPage(POSTS_PAGE);
+
+export function onClickLike(id, isLike) {
+  if (user) {
+    toggleLikes({ token: getToken() }, id, isLike).then((data) => {
+      posts = posts.map(item => {
+        if (item.id === data.post.id) {
+          return data.post;
+        }
+        return item;
+      })
+    }).then(() => {
+      renderApp();
+    })
+  }
+  else {
+    alert("Авторизуйтесь, чтобы иметь возможность ставить лайки");
+    goToPage(AUTH_PAGE);
+  }
+};
+
+export function onDeleteClick({ id }) {
+  if (user) {
+    deletePost({ token: getToken() }, { id }).then(() => {
+      goToPage(ADD_POSTS_PAGE);
+    }).catch((error) => {
+      console.error(error);
+    });
+  };
+};

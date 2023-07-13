@@ -100,7 +100,7 @@ p {
   color: rgb(4, 18, 27);
   border: none;
   border-radius: 5px;
-  background-color: #e8e8e8;
+  background-color: #f2f2f2;
 }
 
 .input .-error {
@@ -160,3 +160,16 @@ strong {
     height: 32px;
   }
 }
+
+.delete-button{
+  background-image: url(assets/images/delete-button.svg);
+  width: 21px;
+  height: 27px;
+  display: none;
+  border: none;
+  background: cover;
+  background-color: white;
+  }
+  .delete-button-active{
+    display: block;
+  }
